@@ -1,3 +1,0 @@
- lag Autocorrelation D-W Statistic p-value
-   1       0.7295814     0.5405341       0
- Alternative hypothesis: rho != 0

@@ -1,7 +1,0 @@
-
-	F test for twoways effects
-
-data:  房價_平均 ~ 人口淨流入 + CPI + 年所得 + 貸款利率 +  ...
-F = 21.526, df1 = 122, df2 = 580, p-value < 2.2e-16
-alternative hypothesis: significant effects
-
