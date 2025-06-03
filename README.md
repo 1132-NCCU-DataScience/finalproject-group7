@@ -46,6 +46,7 @@ Rscript -e "pkgs <- c(
 ); need <- setdiff(pkgs, rownames(installed.packages()));
 if (length(need)) install.packages(need, repos = 'https://cloud.r-project.org');
 source('code/six_city_analysis.R')"
+```
 
 ## Folder organization and its related description
 
