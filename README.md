@@ -33,10 +33,10 @@
 - 欲分析的 CSV：`data/六都房價整合表_UTF8.csv`
 
 ### 2. 一鍵安裝 + 執行
+請確保 six_city_analysis.R 需與 六都房價整合表_UTF8.csv 在同個目錄才可執行
 
 > 如果尚未安裝相依套件，可直接複製下列 **bash** 指令（終端機 / PowerShell 皆可）  
 > 它會自動檢查缺漏的套件、安裝後立即執行主腳本
-> 請確保 six_city_analysis.R 需與 六都房價整合表_UTF8.csv 在同個目錄才可執行
 
 ```bash
 Rscript -e "pkgs <- c(
