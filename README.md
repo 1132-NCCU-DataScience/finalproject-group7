@@ -28,21 +28,24 @@
 
 ## Quick start
 
-1. **環境需求：**
-   - R 4.x 以上版本
-   - 已安裝以下套件（如未安裝請先 `install.packages(...)`）：
+### 1. 必備環境
+- **R 4.x**（或以上）
+- 欲分析的 CSV：`data/六都房價整合表_UTF8.csv`
 
-     ```r
-     tidyverse, readr, lubridate, janitor, purrr,
-     forecast, car, lmtest, sandwich, nlme, plm,
-     broom, ggcorrplot, ggpubr
-     ```
+### 2. 一鍵安裝 + 執行
 
-2. **執行分析主程式：**
-（須確保該目錄中同時有 六都房價整合表_UTF8.csv 檔案存在）
+> 如果尚未安裝相依套件，可直接複製下列 **bash** 指令（終端機 / PowerShell 皆可）  
+> 它會自動檢查缺漏的套件、安裝後立即執行主腳本
+> 請確保 six_city_analysis.R 需與 六都房價整合表_UTF8.csv 在同個目錄才可執行
 
-   ```r
-   Rscript code/six_city_analysis.R
+```bash
+Rscript -e "pkgs <- c(
+  'tidyverse','readr','lubridate','janitor','purrr',
+  'forecast','car','lmtest','sandwich','nlme','plm',
+  'broom','ggcorrplot','ggpubr'
+); need <- setdiff(pkgs, rownames(installed.packages()));
+if (length(need)) install.packages(need, repos = 'https://cloud.r-project.org');
+source('code/six_city_analysis.R')"
 
 ## Folder organization and its related description
 
@@ -75,7 +78,7 @@ project-root/
 ```
 
 
-### docs
+## docs
 |檔名|說明|
 |--|--|
 |`期末專案提案.pdf`|初步規劃研究方向，聚焦於人口遷徙對六都房價的影響，並探討房價上漲是否受非人口因素驅動（如炒房），包含資料來源彙整、研究動機與預期成果。|
@@ -83,7 +86,9 @@ project-root/
 |`展演海報.pdf`|濃縮視覺化呈現研究成果，包括多元迴歸與固定效果模型摘要、異常城市分析（如臺南與臺北的「脫鉤現象」），並提供政策建議與模型比較結果（Adjusted R², AIC）。|
 |`初步分工與排程.pdf`|小組成員早期分工規劃與時程表，協助專案順利推進，分工涵蓋資料處理、模型分析、簡報設計與結果彙整等。|
 
-### data
+> 若想快速瞭解結果，可直接開啟 [`docs/展演海報.pdf`](./docs/展演海報.pdf) ─ 掌握整體報告。
+
+## data
 | 檔名 | 說明 |
 |--|--|
 | `六都房價整合表_UTF8.csv` | 主分析資料表，整合六都各年房價、CPI、人口、利率等欄位（所有欄位皆已清整完畢） |
@@ -98,7 +103,7 @@ project-root/
 > 📂 更多原始來源說明與網址請見 [`data/README.md`](./data/README.md)
 
 
-### code
+## code
 儲存主程式與說明文件，整合資料清理、視覺化、建模與匯出流程。
 
 |檔名|說明|
@@ -111,9 +116,21 @@ project-root/
 - 多元線性、固定效果、GLS 與 Panel 模型建構與比較
 - 模型診斷圖（殘差圖、VIF 熱圖等）與斜率檢定
 
-### results
-* What is your performance?
-* Is the improvement significant?
+## results
+
+| 指標／模型                 | 原始 OLS<br>(lm_full) | 優化 OLS<br>(log + interaction) | Two-way FE<br>(城市 + 月份) | GLS-AR(1) |
+|----------------------------|:---------------------:|:------------------------------:|:---------------------------:|:---------:|
+| **Adjusted R² ↑**          | 0.899 | 0.827 | **0.974** | – |
+| **AIC ↓**                  | 4487.30 | 4871.33 | **3542.45** | 3787.22 |
+| **平均 RMSE (預測) ↓**     | 2.39<sup>*</sup> | – | – | **1.86**<sup>†</sup> |
+
+<sup>*</sup> 2.39 為 Naive 基準模型（六都平均房價）  
+<sup>†</sup> 1.86 為 ARIMA 預測（六都平均）；相較 Naive **誤差降低約 22 %**
+
+- **最終採用模型**：Two-way Fixed Effects（同時控制城市與月份），解釋力最高且 AIC 最低。  
+- **時間序列預測**：ARIMA 模型平均 RMSE = 1.86；詳見 `results/model_and_EDA/其他 EDA 分析/ARIMA_vs_Naive_RMSE.csv`。  
+- 更完整的係數表、Wald 檢定與殘差診斷請參考 `results/model_and_EDA/迴歸分析/` 目錄。
+
 
 ## References
 使用套件：
@@ -124,4 +141,4 @@ project-root/
 
 - ggcorrplot, ggpubr
 
-- 其他資料來源與變數說明請見 data/SOURCE/ 內各檔案、 docs/ 報告內容、code/six_sity_analysis.R 註解。
+- 其他資料來源與變數說明請見 data/SOURCE/ 內各檔案、 docs/ 報告內容、code/six_city_analysis.R 註解。
