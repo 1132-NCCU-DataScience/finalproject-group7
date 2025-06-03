@@ -46,6 +46,7 @@
 
 ## Folder organization and its related description
 
+```text
 project-root/
 ├── code/                    # 分析主程式與說明
 │   ├── six_city_analysis.R
@@ -60,7 +61,7 @@ project-root/
 │   ├── 展演海報.pdf
 │   └── 期末專案提案.pdf
 └── README.md               # 本說明文件
-
+```
 
 ### docs
 |檔名|說明|
