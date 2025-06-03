@@ -46,20 +46,23 @@
 
 ## Folder organization and its related description
 
+```
 project-root/
-├── code/ # 分析主程式與說明
-│ ├── six_city_analysis.R
-│ └── README.md
-├── data/ # 原始來源與整合後 CSV
-│ ├── 六都房價整合表_UTF8.csv
-│ └── SOURCE/ # 各類原始來源（CPI、失業率、交易量等）
-├── results/ # 輸出圖表與模型結果
-│ └── model_and_EDA/
-├── docs/ # 專案報告與簡報文件
-│ ├── 書面分析.pdf
-│ ├── 展演海報.pdf
-│ └── 期末專案提案.pdf
-└── README.md # 本說明文件
+├── code/                    # 分析主程式與說明
+│   ├── six_city_analysis.R
+│   └── README.md
+├── data/                   # 原始來源與整合後 CSV
+│   ├── 六都房價整合表_UTF8.csv
+│   └── SOURCE/             # 各類原始來源（CPI、失業率、交易量等）
+├── results/                # 輸出圖表與模型結果
+│   └── model_and_EDA/
+├── docs/                   # 專案報告與簡報文件
+│   ├── 書面分析.pdf
+│   ├── 展演海報.pdf
+│   └── 期末專案提案.pdf
+└── README.md               # 本說明文件
+```
+
 
 ### docs
 |檔名|說明|
