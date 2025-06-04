@@ -15,6 +15,7 @@
 #     "sandwich",      # Robust SE（vcovHC）
 #     "nlme",          # GLS 模型（corAR1）
 #     "plm"            # panel 資料固定效果回歸
+#     "caret"          # 交叉驗證用的 train()/trainControl()
 # ))
 
 # 載入所需套件
@@ -25,6 +26,7 @@ library(forecast)     # 時間序列預測
 library(janitor)      # 欄位清理
 library(purrr)        # remove_outlier 會用到 reduce
 library(car)
+library(caret)        
 
 options(ggsave.bg = "white")
 
@@ -218,29 +220,51 @@ g9 <- ggplot(df_change2_cln,
     labs(title = "❾ 房價變化率 vs 淨遷徙變化率", x = "淨流入變化率 (%)", y = "房價變化率 (%)")
 ggsave("output/09_變化率_vs_淨流入變化率.png", g9, width = 6, height = 4)
 
-## ❿ 預測誤差比較：各都 RMSE
+## ❿ 預測誤差比較：ARIMA vs Naive baseline + DM test
 # ChatGPT, respond to “fitted() 是做什麼的？為什麼可以用來算 RMSE？” on May 21, 2025
 # ChatGPT, respond to “怎麼用 mean + sd 判斷異常值？這樣準確嗎？” on May 21, 2025
 errors <- map_df(cities, function(ct) {
     dct <- df %>% filter(城市 == ct)
     ts_ct <- ts(dct$房價_平均, start = c(min(dct$年), min(dct$月)), frequency = 12)
+
+    # ARIMA
     fit_ct <- auto.arima(ts_ct)
-    rmse_ct <- sqrt(mean((fitted(fit_ct) - ts_ct)^2, na.rm = TRUE))
-    tibble(城市 = ct, RMSE = rmse_ct)
+    rmse_arima <- sqrt(mean((fitted(fit_ct) - ts_ct)^2, na.rm = TRUE))
+
+    # Null model：隨機漫步 Naive
+    naive_ct <- naive(ts_ct)
+    rmse_naive <- sqrt(mean((fitted(naive_ct) - ts_ct)^2, na.rm = TRUE))
+
+    # Diebold–Mariano 檢定（ARIMA vs NAIVE）
+    dm_p <- tryCatch(
+        forecast::dm.test(residuals(fit_ct), residuals(naive_ct))$p.value,
+        error = function(e) NA_real_
+    )
+
+    tibble(
+        城市          = ct,
+        RMSE_ARIMA   = rmse_arima,
+        RMSE_NAIVE   = rmse_naive,
+        DM_p_value   = dm_p
+    )
 })
-thr <- mean(errors$RMSE) + sd(errors$RMSE)
-errors <- errors %>% mutate(異常 = RMSE > thr)
-g10 <- ggplot(errors, aes(x = reorder(城市, RMSE), y = RMSE, fill = 異常)) +
+
+write_csv(errors, "output/ARIMA_vs_Naive_RMSE.csv")
+
+thr <- mean(errors$RMSE_ARIMA) + sd(errors$RMSE_ARIMA)
+errors <- errors %>% mutate(異常 = RMSE_ARIMA > thr)
+
+g10 <- ggplot(errors, aes(x = reorder(城市, RMSE_ARIMA), y = RMSE_ARIMA, fill = 異常)) +
     geom_col() +
     geom_hline(yintercept = thr, linetype = "dashed", colour = "darkred") +
     annotate("text", x = Inf, y = thr, hjust = 1.05, vjust = -0.4,
              colour = "darkred", label = sprintf("Threshold = %.2f", thr)) +
     coord_flip() +
     scale_fill_manual(values = c("FALSE" = "gray70", "TRUE" = "red")) +
-    labs(title = "❿ 各城市預測 RMSE (標記異常)", x = NULL, y = "RMSE", fill = "異常")
+    labs(title = "❿ 各城市 ARIMA 預測 RMSE (標記異常)", x = NULL, y = "RMSE", fill = "異常")
 ggsave("output/10_預測誤差異常.png", g10, width = 6, height = 4)
 
-message("各縣市與全域分析已完成，並輸出至 output/ ")
+message("各縣市與全域分析已完成（含 baseline 比較），並輸出至 output/ ")
 
 # 房價排名 & 殘差異常
 
@@ -384,6 +408,64 @@ lm_full <- lm(房價_平均 ~ 人口淨流入 + CPI + 年所得 + 貸款利率 +
 summary(lm_full)
 vif(lm_full)
 
+# Null model（截距-only）與 anova 比較
+lm_null <- lm(房價_平均 ~ 1, data = df)
+anova_null_vs_full <- anova(lm_null, lm_full)
+write_lines(capture.output(anova_null_vs_full), "output/Null_vs_Full_ANOVA.txt")
+
+# 先做 df2，以便之後跑任何需要 df2 的檢驗
+df2 <- df %>%
+    mutate(
+        log_人口淨流入 = log10(abs(人口淨流入) + 1),
+        log_CPI        = log10(CPI),
+        交互_人口x利率  = log_人口淨流入 * 貸款利率
+    )
+
+# 5-fold 交叉驗證
+# ChatGPT, respond to “caret::train() 怎麼做 k-fold 交叉驗證？” on May 24, 2025
+set.seed(123)
+cv_ctrl <- trainControl(method = "cv", number = 5)
+lm_cv <- caret::train(
+    房價_平均 ~ 人口淨流入 + CPI + 年所得 + 貸款利率 + 失業率,
+    data = df,
+    method = "lm",
+    trControl = cv_ctrl
+)
+write_lines(capture.output(lm_cv), "output/lm_5fold_CV.txt")
+
+# 5-fold CV：優化模型 (lm_opt) —— 用 df2
+lm_opt_cv <- caret::train(
+  房價_平均 ~ log_人口淨流入 + log_CPI + 年所得 +
+             貸款利率 + 失業率 + 交互_人口x利率,
+  data = df2,
+  method = "lm",
+  trControl = cv_ctrl
+)
+write_lines(capture.output(lm_opt_cv),
+            "output/lm_OPT_5fold_CV.txt")
+
+# 5-fold CV：固定效果模型 (lm_FE) —— 用 df
+lm_FE_cv <- caret::train(
+  房價_平均 ~ 人口淨流入 + CPI + 年所得 + 貸款利率 + 失業率 +
+             factor(城市) + factor(月),
+  data = df,
+  method = "lm",
+  trControl = cv_ctrl
+)
+write_lines(capture.output(lm_FE_cv),
+            "output/lm_FE_5fold_CV.txt")
+
+# 統整三支模型 CV 指標，方便直接放報告
+cv_metrics <- tibble(
+  Model     = c("lm_full",           "lm_opt",            "lm_FE"),
+  RMSE      = c(lm_cv$results$RMSE,  lm_opt_cv$results$RMSE,  lm_FE_cv$results$RMSE),
+  MAE       = c(lm_cv$results$MAE,   lm_opt_cv$results$MAE,   lm_FE_cv$results$MAE),
+  Rsquared  = c(lm_cv$results$Rsquared,
+                lm_opt_cv$results$Rsquared,
+                lm_FE_cv$results$Rsquared)
+)
+write_csv(cv_metrics, "output/CV_metrics_comparison.csv")
+
 # 多重共線性：VIF 與相關係數熱圖
 vif_vals <- vif(lm_full)
 vif_tbl <- tibble(
@@ -446,18 +528,15 @@ dw_full <- car::durbinWatsonTest(lm_full)
 write_lines(capture.output(dw_full), "output/Durbin_Watson.txt")
 
 # 改良模型：對數轉換與交互作用
-df2 <- df %>%
-    mutate(
-        log_人口淨流入 = log10(abs(人口淨流入) + 1),
-        log_CPI        = log10(CPI),
-        交互_人口x利率  = log_人口淨流入 * 貸款利率
-    )
-
 lm_opt <- lm(房價_平均 ~ log_人口淨流入 + log_CPI + 年所得 +
                            貸款利率 + 失業率 + 交互_人口x利率,
              data = df2)
 summary(lm_opt)
 vif(lm_opt)
+
+# anova 比較原 / 優化模型顯著性
+anova_full_vs_opt <- anova(lm_full, lm_opt)
+write_lines(capture.output(anova_full_vs_opt), "output/Full_vs_Opt_ANOVA.txt")
 
 # 模型比較
 comparison <- tibble(
